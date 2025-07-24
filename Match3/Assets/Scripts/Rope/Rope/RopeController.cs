@@ -41,6 +41,7 @@ public class RopeController : MonoBehaviour
 
     private readonly List<RopeSegment> segments = new();
     private LineRenderer lineRenderer;
+    private DistanceJoint2D endJoint;
 
     private void Awake()
     {
@@ -115,7 +116,11 @@ public class RopeController : MonoBehaviour
         // Attach end object to last segment if provided
         if (endPoint != null)
         {
-            DistanceJoint2D endJoint = endPoint.gameObject.AddComponent<DistanceJoint2D>();
+            endJoint = endPoint.gameObject.GetComponent<DistanceJoint2D>();
+            if (endJoint == null)
+            {
+                endJoint = endPoint.gameObject.AddComponent<DistanceJoint2D>();
+            }
             endJoint.autoConfigureDistance = false;
             endJoint.distance = segmentLength;
             endJoint.connectedBody = segments[^1].GetComponent<Rigidbody2D>();
@@ -163,6 +168,21 @@ public class RopeController : MonoBehaviour
             if (lineRenderer != null)
             {
                 lineRenderer.positionCount = segments.Count + 1;
+            }
+
+            // if the end joint is attached to a removed segment detach it
+            if (endJoint != null)
+            {
+                Rigidbody2D conn = endJoint.connectedBody;
+                if (conn != null)
+                {
+                    RopeSegment connSeg = conn.GetComponent<RopeSegment>();
+                    if (detached.Contains(connSeg))
+                    {
+                        Destroy(endJoint);
+                        endJoint = null;
+                    }
+                }
             }
         }
         else
