@@ -103,7 +103,8 @@ public class RopeController : MonoBehaviour
                 Collider2D col = seg.GetComponent<Collider2D>();
                 if (col != null)
                 {
-                    seg.layer = LayerMask.NameToLayer(LayerMask.LayerToName(ropeLayer));
+                    int layerIndex = (int)Mathf.Log(ropeLayer.value, 2);
+                    seg.layer = layerIndex;
                 }
             }
 
