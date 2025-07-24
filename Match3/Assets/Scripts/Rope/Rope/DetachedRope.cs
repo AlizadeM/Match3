@@ -9,6 +9,7 @@ public class DetachedRope : MonoBehaviour
     private LineRenderer lineRenderer;
     private float lifetime;
     private Transform endAnchor;
+    private DistanceJoint2D endJoint;
 
     // Called by RopeController immediately after creation.
     public void Initialize(List<RopeSegment> segs, LineRenderer template, float destroyAfter, Transform anchor = null)
@@ -16,6 +17,10 @@ public class DetachedRope : MonoBehaviour
         segments = segs;
         lifetime = destroyAfter;
         endAnchor = anchor;
+        if (endAnchor != null)
+        {
+            endJoint = endAnchor.GetComponent<DistanceJoint2D>();
+        }
 
         lineRenderer = GetComponent<LineRenderer>();
         if (lineRenderer == null)
@@ -68,6 +73,60 @@ public class DetachedRope : MonoBehaviour
         if (endAnchor != null)
         {
             lineRenderer.SetPosition(count - 1, endAnchor.position);
+        }
+    }
+
+    // Handle further cuts on this detached rope in the same way as RopeController.
+    public void CutRopeAt(GameObject hitSegment)
+    {
+        RopeSegment seg = hitSegment.GetComponent<RopeSegment>();
+        if (seg == null)
+            return;
+
+        int index = segments.IndexOf(seg);
+        if (index == -1)
+        {
+            seg.Cut();
+            return;
+        }
+
+        List<RopeSegment> bottom = segments.GetRange(index, segments.Count - index);
+        segments.RemoveRange(index, segments.Count - index);
+
+        if (lineRenderer != null)
+        {
+            lineRenderer.positionCount = segments.Count + (endAnchor != null ? 1 : 0);
+        }
+
+        seg.Cut();
+
+        bool keepAnchor = false;
+        if (endJoint != null)
+        {
+            Rigidbody2D conn = endJoint.connectedBody;
+            if (conn != null)
+            {
+                RopeSegment connSeg = conn.GetComponent<RopeSegment>();
+                if (bottom.Contains(connSeg))
+                {
+                    keepAnchor = true;
+                    endJoint = null;
+                }
+            }
+        }
+
+        if (bottom.Count > 0)
+        {
+            GameObject temp = new("DetachedRope");
+            DetachedRope dr = temp.AddComponent<DetachedRope>();
+            temp.AddComponent<LineRenderer>();
+            float life = keepAnchor ? -1f : lifetime;
+            dr.Initialize(bottom, lineRenderer, life, keepAnchor ? endAnchor : null);
+        }
+
+        if (!keepAnchor)
+        {
+            endAnchor = null;
         }
     }
 }
