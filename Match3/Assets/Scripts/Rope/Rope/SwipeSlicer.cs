@@ -21,31 +21,30 @@ public class SwipeSlicer : MonoBehaviour
     private void Update()
     {
         // Handle touch input on mobile
-        if (Input.touchCount > 0)
-        {
-            Touch touch = Input.GetTouch(0);
-            switch (touch.phase)
-            {
-                case TouchPhase.Began:
-                    slicing = true;
-                    lastScreenPos = touch.position;
-                    break;
-                case TouchPhase.Moved:
-                    if (slicing)
-                    {
-                        TrySlice(lastScreenPos, touch.position);
-                        lastScreenPos = touch.position;
-                    }
-                    break;
-                case TouchPhase.Ended:
-                case TouchPhase.Canceled:
-                    slicing = false;
-                    break;
-            }
-        }
+        // if (Input.touchCount > 0)
+        // {
+        //     Touch touch = Input.GetTouch(0);
+        //     switch (touch.phase)
+        //     {
+        //         case TouchPhase.Began:
+        //             slicing = true;
+        //             lastScreenPos = touch.position;
+        //             break;
+        //         case TouchPhase.Moved:
+        //             if (slicing)
+        //             {
+        //                 TrySlice(lastScreenPos, touch.position);
+        //                 lastScreenPos = touch.position;
+        //             }
+        //             break;
+        //         case TouchPhase.Ended:
+        //         case TouchPhase.Canceled:
+        //             slicing = false;
+        //             break;
+        //     }
+        // }
 
         // Allow mouse input in the editor for testing
-#if UNITY_EDITOR
         if (Input.GetMouseButtonDown(0))
         {
             slicing = true;
@@ -61,17 +60,25 @@ public class SwipeSlicer : MonoBehaviour
         {
             slicing = false;
         }
-#endif
     }
 
     // Perform a linecast between two screen positions and cut any rope colliders hit.
     private void TrySlice(Vector2 screenStart, Vector2 screenEnd)
     {
+        float zDistance = Mathf.Abs(Camera.main.transform.position.z - 0f); 
+
         if (Camera.main == null)
+        {
+            Debug.Log("Camera Not found!");
             return;
-        Vector3 worldStart = Camera.main.ScreenToWorldPoint(screenStart);
-        Vector3 worldEnd = Camera.main.ScreenToWorldPoint(screenEnd);
-        RaycastHit2D hit = Physics2D.Linecast(worldStart, worldEnd, ropeLayerMask);
+        }
+        Vector3 worldStart = Camera.main.ScreenToWorldPoint(
+            new Vector3(screenStart.x, screenStart.y, zDistance)
+        );
+        Vector3 worldEnd = Camera.main.ScreenToWorldPoint(
+            new Vector3(screenEnd.x,   screenEnd.y,   zDistance)
+        );
+        RaycastHit2D hit = Physics2D.Linecast(worldStart, worldEnd,ropeLayerMask);
         if (debugDraw)
         {
             Debug.DrawLine(worldStart, worldEnd, Color.red, 0.5f);

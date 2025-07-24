@@ -386,6 +386,9 @@
 "Assets/CodeMonkey/Utils/World_Mesh.cs"
 "Assets/CodeMonkey/Utils/World_Sprite.cs"
 "Assets/Scripts/Configs/BoardConfig.cs"
+"Assets/Scripts/Rope/Rope/RopeController.cs"
+"Assets/Scripts/Rope/Rope/RopeSegment.cs"
+"Assets/Scripts/Rope/Rope/SwipeSlicer.cs"
 -langversion:9.0
 
 /deterministic
