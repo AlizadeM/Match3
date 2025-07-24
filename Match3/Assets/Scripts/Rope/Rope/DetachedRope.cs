@@ -124,9 +124,14 @@ public class DetachedRope : MonoBehaviour
             dr.Initialize(bottom, lineRenderer, life, keepAnchor ? endAnchor : null);
         }
 
-        if (!keepAnchor)
+        if (keepAnchor)
         {
+            // anchor moves to the newly spawned detached piece
             endAnchor = null;
+            if (lineRenderer != null)
+            {
+                lineRenderer.positionCount = segments.Count;
+            }
         }
     }
 }
