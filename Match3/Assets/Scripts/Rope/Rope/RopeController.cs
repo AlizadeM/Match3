@@ -145,29 +145,45 @@ public class RopeController : MonoBehaviour
     public void CutRopeAt(GameObject hitSegment)
     {
         RopeSegment seg = hitSegment.GetComponent<RopeSegment>();
-        if (seg != null)
-        {
-            int index = segments.IndexOf(seg);
-            if (index != -1)
-            {
-                // detach the sliced segment and everything below it
-                for (int i = segments.Count - 1; i >= index; i--)
-                {
-                    segments[i].Cut();
-                    segments.RemoveAt(i);
-                }
+        if (seg == null)
+            return;
 
-                // shrink the line renderer to the remaining segments
-                if (lineRenderer != null)
-                {
-                    lineRenderer.positionCount = segments.Count + 1;
-                }
-            }
-            else
+        int index = segments.IndexOf(seg);
+        List<RopeSegment> detached = new();
+
+        if (index != -1)
+        {
+            // grab all segments starting from the cut
+            detached.AddRange(segments.GetRange(index, segments.Count - index));
+
+            // remove them from the main rope
+            segments.RemoveRange(index, segments.Count - index);
+
+            // shrink the line renderer to the remaining segments
+            if (lineRenderer != null)
             {
-                // fallback if segment isn't tracked
-                seg.Cut();
+                lineRenderer.positionCount = segments.Count + 1;
             }
+        }
+        else
+        {
+            // not tracked but still cuttable
+            detached.Add(seg);
+        }
+
+        // detach all gathered segments
+        foreach (RopeSegment s in detached)
+        {
+            s.Cut();
+        }
+
+        if (detached.Count > 0)
+        {
+            // create a temporary object to render the falling piece
+            GameObject temp = new("DetachedRope");
+            DetachedRope dr = temp.AddComponent<DetachedRope>();
+            temp.AddComponent<LineRenderer>();
+            dr.Initialize(detached, lineRenderer, 5f);
         }
     }
 }
