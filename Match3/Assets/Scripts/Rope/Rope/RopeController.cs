@@ -147,7 +147,27 @@ public class RopeController : MonoBehaviour
         RopeSegment seg = hitSegment.GetComponent<RopeSegment>();
         if (seg != null)
         {
-            seg.Cut();
+            int index = segments.IndexOf(seg);
+            if (index != -1)
+            {
+                // detach the sliced segment and everything below it
+                for (int i = segments.Count - 1; i >= index; i--)
+                {
+                    segments[i].Cut();
+                    segments.RemoveAt(i);
+                }
+
+                // shrink the line renderer to the remaining segments
+                if (lineRenderer != null)
+                {
+                    lineRenderer.positionCount = segments.Count + 1;
+                }
+            }
+            else
+            {
+                // fallback if segment isn't tracked
+                seg.Cut();
+            }
         }
     }
 }
