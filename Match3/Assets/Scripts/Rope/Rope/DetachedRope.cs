@@ -8,12 +8,14 @@ public class DetachedRope : MonoBehaviour
     private List<RopeSegment> segments;
     private LineRenderer lineRenderer;
     private float lifetime;
+    private Transform endAnchor;
 
     // Called by RopeController immediately after creation.
-    public void Initialize(List<RopeSegment> segs, LineRenderer template, float destroyAfter)
+    public void Initialize(List<RopeSegment> segs, LineRenderer template, float destroyAfter, Transform anchor = null)
     {
         segments = segs;
         lifetime = destroyAfter;
+        endAnchor = anchor;
 
         lineRenderer = GetComponent<LineRenderer>();
         if (lineRenderer == null)
@@ -36,12 +38,17 @@ public class DetachedRope : MonoBehaviour
             if (seg != null)
             {
                 seg.transform.SetParent(transform, true);
-                Destroy(seg.gameObject, lifetime);
+                if (lifetime > 0f)
+                {
+                    Destroy(seg.gameObject, lifetime);
+                }
             }
         }
 
-        // Destroy this container as well after the lifetime
-        Destroy(gameObject, lifetime);
+        if (lifetime > 0f)
+        {
+            Destroy(gameObject, lifetime);
+        }
     }
 
     private void Update()
@@ -49,13 +56,18 @@ public class DetachedRope : MonoBehaviour
         if (lineRenderer == null || segments == null)
             return;
 
-        lineRenderer.positionCount = segments.Count;
+        int count = segments.Count + (endAnchor != null ? 1 : 0);
+        lineRenderer.positionCount = count;
         for (int i = 0; i < segments.Count; i++)
         {
             if (segments[i] != null)
             {
                 lineRenderer.SetPosition(i, segments[i].transform.position);
             }
+        }
+        if (endAnchor != null)
+        {
+            lineRenderer.SetPosition(count - 1, endAnchor.position);
         }
     }
 }

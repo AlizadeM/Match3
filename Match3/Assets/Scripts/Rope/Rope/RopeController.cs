@@ -154,56 +154,51 @@ public class RopeController : MonoBehaviour
             return;
 
         int index = segments.IndexOf(seg);
-        List<RopeSegment> detached = new();
-
-        if (index != -1)
+        if (index == -1)
         {
-            // grab all segments starting from the cut
-            detached.AddRange(segments.GetRange(index, segments.Count - index));
+            seg.Cut();
+            return;
+        }
 
-            // remove them from the main rope
-            segments.RemoveRange(index, segments.Count - index);
+        // bottom part including the cut segment
+        List<RopeSegment> bottom = segments.GetRange(index, segments.Count - index);
 
-            // shrink the line renderer to the remaining segments
-            if (lineRenderer != null)
+        // remove them from this rope
+        segments.RemoveRange(index, segments.Count - index);
+
+        // shrink the line renderer to the remaining segments
+        if (lineRenderer != null)
+        {
+            lineRenderer.positionCount = segments.Count + 1;
+        }
+
+        // cut only the first segment so the chain stays intact
+        seg.Cut();
+
+        bool keepAnchor = false;
+        if (endJoint != null)
+        {
+            Rigidbody2D conn = endJoint.connectedBody;
+            if (conn != null)
             {
-                lineRenderer.positionCount = segments.Count + 1;
-            }
-
-            // if the end joint is attached to a removed segment detach it
-            if (endJoint != null)
-            {
-                Rigidbody2D conn = endJoint.connectedBody;
-                if (conn != null)
+                RopeSegment connSeg = conn.GetComponent<RopeSegment>();
+                if (bottom.Contains(connSeg))
                 {
-                    RopeSegment connSeg = conn.GetComponent<RopeSegment>();
-                    if (detached.Contains(connSeg))
-                    {
-                        Destroy(endJoint);
-                        endJoint = null;
-                    }
+                    // piece stays attached to the end object
+                    keepAnchor = true;
+                    endJoint = null;
                 }
             }
         }
-        else
-        {
-            // not tracked but still cuttable
-            detached.Add(seg);
-        }
 
-        // detach all gathered segments
-        foreach (RopeSegment s in detached)
+        // create a temporary object to render the detached piece
+        if (bottom.Count > 0)
         {
-            s.Cut();
-        }
-
-        if (detached.Count > 0)
-        {
-            // create a temporary object to render the falling piece
             GameObject temp = new("DetachedRope");
             DetachedRope dr = temp.AddComponent<DetachedRope>();
             temp.AddComponent<LineRenderer>();
-            dr.Initialize(detached, lineRenderer, 5f);
+            float lifetime = keepAnchor ? -1f : 5f;
+            dr.Initialize(bottom, lineRenderer, lifetime, keepAnchor ? endPoint : null);
         }
     }
 }
