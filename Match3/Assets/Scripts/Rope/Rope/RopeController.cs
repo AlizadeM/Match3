@@ -41,6 +41,7 @@ public class RopeController : MonoBehaviour
 
     private readonly List<RopeSegment> segments = new();
     private LineRenderer lineRenderer;
+    private DistanceJoint2D endJoint;
 
     private void Awake()
     {
@@ -103,7 +104,8 @@ public class RopeController : MonoBehaviour
                 Collider2D col = seg.GetComponent<Collider2D>();
                 if (col != null)
                 {
-                    seg.layer = LayerMask.NameToLayer(LayerMask.LayerToName(ropeLayer));
+                    int layerIndex = (int)Mathf.Log(ropeLayer.value, 2);
+                    seg.layer = layerIndex;
                 }
             }
 
@@ -114,7 +116,11 @@ public class RopeController : MonoBehaviour
         // Attach end object to last segment if provided
         if (endPoint != null)
         {
-            DistanceJoint2D endJoint = endPoint.gameObject.AddComponent<DistanceJoint2D>();
+            endJoint = endPoint.gameObject.GetComponent<DistanceJoint2D>();
+            if (endJoint == null)
+            {
+                endJoint = endPoint.gameObject.AddComponent<DistanceJoint2D>();
+            }
             endJoint.autoConfigureDistance = false;
             endJoint.distance = segmentLength;
             endJoint.connectedBody = segments[^1].GetComponent<Rigidbody2D>();
@@ -144,9 +150,60 @@ public class RopeController : MonoBehaviour
     public void CutRopeAt(GameObject hitSegment)
     {
         RopeSegment seg = hitSegment.GetComponent<RopeSegment>();
-        if (seg != null)
+        if (seg == null)
+            return;
+
+        int index = segments.IndexOf(seg);
+        List<RopeSegment> detached = new();
+
+        if (index != -1)
         {
-            seg.Cut();
+            // grab all segments starting from the cut
+            detached.AddRange(segments.GetRange(index, segments.Count - index));
+
+            // remove them from the main rope
+            segments.RemoveRange(index, segments.Count - index);
+
+            // shrink the line renderer to the remaining segments
+            if (lineRenderer != null)
+            {
+                lineRenderer.positionCount = segments.Count + 1;
+            }
+
+            // if the end joint is attached to a removed segment detach it
+            if (endJoint != null)
+            {
+                Rigidbody2D conn = endJoint.connectedBody;
+                if (conn != null)
+                {
+                    RopeSegment connSeg = conn.GetComponent<RopeSegment>();
+                    if (detached.Contains(connSeg))
+                    {
+                        Destroy(endJoint);
+                        endJoint = null;
+                    }
+                }
+            }
+        }
+        else
+        {
+            // not tracked but still cuttable
+            detached.Add(seg);
+        }
+
+        // detach all gathered segments
+        foreach (RopeSegment s in detached)
+        {
+            s.Cut();
+        }
+
+        if (detached.Count > 0)
+        {
+            // create a temporary object to render the falling piece
+            GameObject temp = new("DetachedRope");
+            DetachedRope dr = temp.AddComponent<DetachedRope>();
+            temp.AddComponent<LineRenderer>();
+            dr.Initialize(detached, lineRenderer, 5f);
         }
     }
 }
