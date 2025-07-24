@@ -83,6 +83,14 @@ public class SwipeSlicer : MonoBehaviour
             {
                 rope.CutRopeAt(hit.collider.gameObject);
             }
+            else
+            {
+                DetachedRope dr = hit.collider.GetComponentInParent<DetachedRope>();
+                if (dr != null)
+                {
+                    dr.CutRopeAt(hit.collider.gameObject);
+                }
+            }
         }
     }
 }
