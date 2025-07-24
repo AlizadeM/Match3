@@ -277,7 +277,7 @@ GameObject:
   - component: {fileID: 102000002}
   m_Layer: 6
   m_Name: Anchor1
-  m_TagString: Untagged
+  m_TagString: Rope
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -329,7 +329,7 @@ GameObject:
   - component: {fileID: 103000002}
   m_Layer: 6
   m_Name: Anchor2
-  m_TagString: Untagged
+  m_TagString: Rope
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -380,9 +380,9 @@ GameObject:
   - component: {fileID: 112000001}
   - component: {fileID: 112000002}
   - component: {fileID: 112000003}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Rope1
-  m_TagString: Untagged
+  m_TagString: Rope
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -492,9 +492,9 @@ GameObject:
   - component: {fileID: 113000001}
   - component: {fileID: 113000002}
   - component: {fileID: 113000003}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Rope2
-  m_TagString: Untagged
+  m_TagString: Rope
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
