@@ -10,6 +10,34 @@ public class DetachedRope : MonoBehaviour
     private float lifetime;
     private Transform endAnchor;
     private DistanceJoint2D endJoint;
+    private bool destructionScheduled;
+
+    private void UpdateLine()
+    {
+        if (lineRenderer == null || segments == null)
+            return;
+        int count = segments.Count + (endAnchor != null ? 1 : 0);
+        lineRenderer.positionCount = count;
+        for (int i = 0; i < segments.Count; i++)
+        {
+            if (segments[i] != null)
+                lineRenderer.SetPosition(i, segments[i].transform.position);
+        }
+        if (endAnchor != null)
+            lineRenderer.SetPosition(count - 1, endAnchor.position);
+    }
+    private void ScheduleDestruction(float time)
+    {
+        if (destructionScheduled || time <= 0f)
+            return;
+        destructionScheduled = true;
+        foreach (var seg in segments)
+        {
+            if (seg != null)
+                Destroy(seg.gameObject, time);
+        }
+        Destroy(gameObject, time);
+    }
 
     // Called by RopeController immediately after creation.
     public void Initialize(List<RopeSegment> segs, LineRenderer template, float destroyAfter, Transform anchor = null)
@@ -61,37 +89,16 @@ public class DetachedRope : MonoBehaviour
             if (seg != null)
             {
                 seg.transform.SetParent(transform, true);
-                if (lifetime > 0f)
-                {
-                    Destroy(seg.gameObject, lifetime);
-                }
             }
         }
 
-        if (lifetime > 0f)
-        {
-            Destroy(gameObject, lifetime);
-        }
+        UpdateLine();
+        ScheduleDestruction(lifetime);
     }
 
     private void Update()
     {
-        if (lineRenderer == null || segments == null)
-            return;
-
-        int count = segments.Count + (endAnchor != null ? 1 : 0);
-        lineRenderer.positionCount = count;
-        for (int i = 0; i < segments.Count; i++)
-        {
-            if (segments[i] != null)
-            {
-                lineRenderer.SetPosition(i, segments[i].transform.position);
-            }
-        }
-        if (endAnchor != null)
-        {
-            lineRenderer.SetPosition(count - 1, endAnchor.position);
-        }
+        UpdateLine();
     }
 
     // Handle further cuts on this detached rope in the same way as RopeController.
@@ -115,6 +122,8 @@ public class DetachedRope : MonoBehaviour
         {
             lineRenderer.positionCount = segments.Count + (endAnchor != null ? 1 : 0);
         }
+
+        UpdateLine();
 
         seg.Cut();
 
@@ -146,6 +155,17 @@ public class DetachedRope : MonoBehaviour
             {
                 lineRenderer.positionCount = segments.Count;
             }
+            lifetime = 5f;
+            ScheduleDestruction(lifetime);
+        }
+
+        if (segments.Count == 0)
+        {
+            Destroy(gameObject);
+        }
+        else
+        {
+            UpdateLine();
         }
     }
 }
