@@ -19,7 +19,25 @@ public class DetachedRope : MonoBehaviour
         endAnchor = anchor;
         if (endAnchor != null)
         {
-            endJoint = endAnchor.GetComponent<DistanceJoint2D>();
+            Rigidbody2D anchorRb = endAnchor.GetComponent<Rigidbody2D>();
+            foreach (var s in segs)
+            {
+                foreach (var j in s.GetComponents<DistanceJoint2D>())
+                {
+                    if (anchorRb != null && j.connectedBody == anchorRb)
+                    {
+                        endJoint = j;
+                        break;
+                    }
+                    if (anchorRb == null && j.connectedBody == null)
+                    {
+                        endJoint = j;
+                        break;
+                    }
+                }
+                if (endJoint != null)
+                    break;
+            }
         }
 
         lineRenderer = GetComponent<LineRenderer>();
@@ -103,15 +121,11 @@ public class DetachedRope : MonoBehaviour
         bool keepAnchor = false;
         if (endJoint != null)
         {
-            Rigidbody2D conn = endJoint.connectedBody;
-            if (conn != null)
+            RopeSegment anchorSeg = endJoint.GetComponent<RopeSegment>();
+            if (bottom.Contains(anchorSeg))
             {
-                RopeSegment connSeg = conn.GetComponent<RopeSegment>();
-                if (bottom.Contains(connSeg))
-                {
-                    keepAnchor = true;
-                    endJoint = null;
-                }
+                keepAnchor = true;
+                endJoint = null;
             }
         }
 
