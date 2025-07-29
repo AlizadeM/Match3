@@ -298,14 +298,43 @@ public class RopeController : MonoBehaviour
 
     private void ReleaseAttachments(List<RopeSegment> piece, bool anchored)
     {
-        if (anchored) return;
+        // Detach any registered objects that belong to this piece
         foreach (var att in attachedObjects)
         {
             if (att.segment != null && att.instance != null && piece.Contains(att.segment))
             {
                 var j = att.instance.GetComponent<DistanceJoint2D>();
-                if (j != null) Destroy(j);
+                if (j != null)
+                {
+                    Destroy(j);
+                }
                 att.segment = null;
+            }
+        }
+
+        // If the piece is going to fall, also destroy any joints from other
+        // objects that reference its segments so the rope can separate cleanly.
+        if (!anchored)
+        {
+            HashSet<Rigidbody2D> bodies = new();
+            foreach (var seg in piece)
+            {
+                var rb = seg.GetComponent<Rigidbody2D>();
+                if (rb != null) bodies.Add(rb);
+            }
+
+            foreach (var joint in Object.FindObjectsOfType<Joint2D>())
+            {
+                if (joint == null) continue;
+                var connected = joint.connectedBody;
+                if (connected != null && bodies.Contains(connected))
+                {
+                    var owner = joint.GetComponent<Rigidbody2D>();
+                    if (owner == null || !bodies.Contains(owner))
+                    {
+                        Destroy(joint);
+                    }
+                }
             }
         }
     }
