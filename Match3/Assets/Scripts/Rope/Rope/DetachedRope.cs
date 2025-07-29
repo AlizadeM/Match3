@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -35,10 +34,10 @@ public class DetachedRope : MonoBehaviour
         StartCoroutine(FadeAndDestroy(time));
     }
 
-    private IEnumerator FadeAndDestroy(float time)
+    private System.Collections.IEnumerator FadeAndDestroy(float time)
     {
         float remaining = time;
-        float fade = Mathf.Min(0.1f, time);
+        float fade = Mathf.Min(0.5f, time);
         while (remaining > 0f)
         {
             if (remaining < fade && lineRenderer != null)

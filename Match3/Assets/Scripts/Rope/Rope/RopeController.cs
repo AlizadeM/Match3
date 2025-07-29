@@ -1,4 +1,3 @@
-using System.Collections;
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -153,7 +152,7 @@ public class RopeController : MonoBehaviour
         StartCoroutine(ApplySegmentConnections());
     }
 
-    private IEnumerator ApplySegmentConnections()
+    private System.Collections.IEnumerator ApplySegmentConnections()
     {
         // wait one frame so other ropes can finish building
         yield return null;
@@ -408,6 +407,42 @@ public class RopeController : MonoBehaviour
             temp.AddComponent<LineRenderer>();
             float lifetime = anchored ? -1f : 0.5f;
             dr.Initialize(bottom, lineRenderer, lifetime, anchor);
+        }
+
+        // Look for the closest attached object on the remaining part of the rope
+        int fadeIndex = -1;
+        for (int i = 0; i < attachedObjects.Count; i++)
+        {
+            var att = attachedObjects[i];
+            if (att.segment == null)
+                continue;
+            int idx = segments.IndexOf(att.segment);
+            if (idx >= 0 && (fadeIndex == -1 || idx > fadeIndex))
+            {
+                fadeIndex = idx;
+            }
+        }
+
+        if (fadeIndex != -1)
+        {
+            RopeSegment cutSeg = segments[fadeIndex];
+            List<RopeSegment> piece = segments.GetRange(fadeIndex, segments.Count - fadeIndex);
+            segments.RemoveRange(fadeIndex, segments.Count - fadeIndex);
+            if (lineRenderer != null)
+            {
+                lineRenderer.positionCount = segments.Count + 1;
+            }
+            cutSeg.Cut();
+            bool anchored2 = PieceAnchored(piece);
+            ReleaseAttachments(piece, anchored2);
+            if (piece.Count > 0)
+            {
+                GameObject temp2 = new("DetachedRope");
+                DetachedRope dr2 = temp2.AddComponent<DetachedRope>();
+                temp2.AddComponent<LineRenderer>();
+                float lifetime2 = anchored2 ? -1f : 0.5f;
+                dr2.Initialize(piece, lineRenderer, lifetime2);
+            }
         }
     }
 }
