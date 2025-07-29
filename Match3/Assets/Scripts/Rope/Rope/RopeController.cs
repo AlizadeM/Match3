@@ -39,8 +39,97 @@ public class RopeController : MonoBehaviour
     [Tooltip("Layer mask used by the slicer to detect rope colliders.")]
     public LayerMask ropeLayer;
 
+    [Header("Connect To Another Rope")]
+    [Tooltip("Optional rope whose segment will act as this rope's start anchor.")]
+    public RopeController startSegmentRope;
+    [Tooltip("Segment index on startSegmentRope to attach to.")]
+    public int startSegmentIndex;
+
+    [Tooltip("Optional rope whose segment will act as this rope's end anchor.")]
+    public RopeController endSegmentRope;
+    [Tooltip("Segment index on endSegmentRope to attach to.")]
+    public int endSegmentIndex;
+
+    [System.Serializable]
+    public class AttachedObject
+    {
+        public GameObject prefab;
+        public int segmentIndex;
+
+        [HideInInspector] public RopeSegment segment;
+        [HideInInspector] public GameObject instance;
+    }
+
+    [Header("Objects Attached to Segments")]
+    public List<AttachedObject> attachedObjects = new();
+
     private readonly List<RopeSegment> segments = new();
     private LineRenderer lineRenderer;
+    private DistanceJoint2D endJoint;
+
+    // Allow other scripts to query segments for dynamic connections
+    public RopeSegment GetSegment(int index)
+    {
+        if (index < 0 || index >= segments.Count)
+            return null;
+        return segments[index];
+    }
+
+    // Attach the rope's starting joint to a different anchor at runtime.
+    public void AttachStartAnchor(Transform newAnchor)
+    {
+        if (segments.Count == 0 || newAnchor == null)
+            return;
+        startPoint = newAnchor;
+        DistanceJoint2D joint = segments[0].GetComponent<DistanceJoint2D>();
+        Rigidbody2D rb = newAnchor.GetComponent<Rigidbody2D>();
+        if (rb != null)
+        {
+            joint.connectedBody = rb;
+            joint.connectedAnchor = Vector2.zero;
+        }
+        else
+        {
+            joint.connectedBody = null;
+            joint.connectedAnchor = newAnchor.position;
+        }
+    }
+
+    // Attach or move the end joint to a new anchor at runtime.
+    public void AttachEndAnchor(Transform newAnchor)
+    {
+        if (segments.Count == 0)
+            return;
+
+        if (endJoint == null)
+        {
+            endJoint = segments[^1].gameObject.AddComponent<DistanceJoint2D>();
+            endJoint.autoConfigureDistance = false;
+            endJoint.distance = segmentLength;
+        }
+
+        endPoint = newAnchor;
+
+        if (newAnchor != null)
+        {
+            Rigidbody2D rb = newAnchor.GetComponent<Rigidbody2D>();
+            if (rb != null)
+            {
+                endJoint.connectedBody = rb;
+                endJoint.connectedAnchor = Vector2.zero;
+            }
+            else
+            {
+                endJoint.connectedBody = null;
+                endJoint.connectedAnchor = newAnchor.position;
+            }
+        }
+        else
+        {
+            Destroy(endJoint);
+            endJoint = null;
+        }
+    }
 
     private void Awake()
     {
@@ -59,6 +148,32 @@ public class RopeController : MonoBehaviour
             return;
         }
         BuildRope();
+        AttachObjects();
+        StartCoroutine(ApplySegmentConnections());
+    }
+
+    private System.Collections.IEnumerator ApplySegmentConnections()
+    {
+        // wait one frame so other ropes can finish building
+        yield return null;
+
+        if (startSegmentRope != null)
+        {
+            RopeSegment seg = startSegmentRope.GetSegment(startSegmentIndex);
+            if (seg != null)
+            {
+                AttachStartAnchor(seg.transform);
+            }
+        }
+
+        if (endSegmentRope != null)
+        {
+            RopeSegment seg = endSegmentRope.GetSegment(endSegmentIndex);
+            if (seg != null)
+            {
+                AttachEndAnchor(seg.transform);
+            }
+        }
     }
 
     private void Update()
@@ -103,7 +218,8 @@ public class RopeController : MonoBehaviour
                 Collider2D col = seg.GetComponent<Collider2D>();
                 if (col != null)
                 {
-                    seg.layer = LayerMask.NameToLayer(LayerMask.LayerToName(ropeLayer));
+                    int layerIndex = (int)Mathf.Log(ropeLayer.value, 2);
+                    seg.layer = layerIndex;
                 }
             }
 
@@ -111,13 +227,114 @@ public class RopeController : MonoBehaviour
             previousBody = rb;
         }
 
-        // Attach end object to last segment if provided
+        // Attach the last segment to the end point if provided.  The joint is
+        // placed on the last segment so the end point itself does not require
+        // a Rigidbody2D (e.g. when it is just a static anchor).
         if (endPoint != null)
         {
-            DistanceJoint2D endJoint = endPoint.gameObject.AddComponent<DistanceJoint2D>();
+            endJoint = segments[^1].gameObject.AddComponent<DistanceJoint2D>();
             endJoint.autoConfigureDistance = false;
             endJoint.distance = segmentLength;
-            endJoint.connectedBody = segments[^1].GetComponent<Rigidbody2D>();
+
+            Rigidbody2D anchorRb = endPoint.GetComponent<Rigidbody2D>();
+            if (anchorRb != null)
+            {
+                endJoint.connectedBody = anchorRb;
+            }
+            else
+            {
+                endJoint.connectedBody = null;
+                endJoint.connectedAnchor = endPoint.position;
+            }
+        }
+    }
+
+    private void AttachObjects()
+    {
+        foreach (var obj in attachedObjects)
+        {
+            if (obj.prefab == null) continue;
+            if (obj.segmentIndex < 0 || obj.segmentIndex >= segments.Count) continue;
+            RopeSegment seg = segments[obj.segmentIndex];
+            GameObject inst = Instantiate(obj.prefab, seg.transform.position, Quaternion.identity);
+            Rigidbody2D segBody = seg.GetComponent<Rigidbody2D>();
+            DistanceJoint2D joint = inst.AddComponent<DistanceJoint2D>();
+            joint.autoConfigureDistance = false;
+            joint.distance = 0f;
+            joint.connectedBody = segBody;
+            obj.instance = inst;
+            obj.segment = seg;
+        }
+    }
+
+    private bool PieceAnchored(List<RopeSegment> piece)
+    {
+        HashSet<Rigidbody2D> bodies = new();
+        foreach (var s in piece)
+        {
+            var rb = s.GetComponent<Rigidbody2D>();
+            if (rb != null) bodies.Add(rb);
+        }
+
+        foreach (var s in piece)
+        {
+            foreach (var j in s.GetComponents<DistanceJoint2D>())
+            {
+                if (j == null) continue;
+                Rigidbody2D cb = j.connectedBody;
+                if (cb == null)
+                {
+                    return true;
+                }
+                if (!bodies.Contains(cb))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void ReleaseAttachments(List<RopeSegment> piece, bool anchored)
+    {
+        // Detach any registered objects that belong to this piece
+        foreach (var att in attachedObjects)
+        {
+            if (att.segment != null && att.instance != null && piece.Contains(att.segment))
+            {
+                var j = att.instance.GetComponent<DistanceJoint2D>();
+                if (j != null)
+                {
+                    Destroy(j);
+                }
+                att.segment = null;
+            }
+        }
+
+        // If the piece is going to fall, also destroy any joints from other
+        // objects that reference its segments so the rope can separate cleanly.
+        if (!anchored)
+        {
+            HashSet<Rigidbody2D> bodies = new();
+            foreach (var seg in piece)
+            {
+                var rb = seg.GetComponent<Rigidbody2D>();
+                if (rb != null) bodies.Add(rb);
+            }
+
+            foreach (var joint in Object.FindObjectsOfType<Joint2D>())
+            {
+                if (joint == null) continue;
+                var connected = joint.connectedBody;
+                if (connected != null && bodies.Contains(connected))
+                {
+                    var owner = joint.GetComponent<Rigidbody2D>();
+                    if (owner == null || !bodies.Contains(owner))
+                    {
+                        Destroy(joint);
+                    }
+                }
+            }
         }
     }
 
@@ -144,9 +361,131 @@ public class RopeController : MonoBehaviour
     public void CutRopeAt(GameObject hitSegment)
     {
         RopeSegment seg = hitSegment.GetComponent<RopeSegment>();
-        if (seg != null)
+        if (seg == null)
+            return;
+
+        int index = segments.IndexOf(seg);
+        if (index == -1)
         {
             seg.Cut();
+            return;
+        }
+
+        // bottom part including the cut segment
+        List<RopeSegment> bottom = segments.GetRange(index, segments.Count - index);
+
+        // record if any attached objects belong to this falling section
+        bool objectBelow = false;
+        foreach (var att in attachedObjects)
+        {
+            if (att.segment != null && bottom.Contains(att.segment))
+            {
+                objectBelow = true;
+                break;
+            }
+        }
+
+        // remove them from this rope
+        segments.RemoveRange(index, segments.Count - index);
+
+        // shrink the line renderer to the remaining segments
+        if (lineRenderer != null)
+        {
+            lineRenderer.positionCount = segments.Count + 1;
+        }
+
+        // cut only the first segment so the chain stays intact
+        seg.Cut();
+
+        Transform anchor = null;
+        if (endJoint != null)
+        {
+            RopeSegment endSeg = endJoint.GetComponent<RopeSegment>();
+            if (bottom.Contains(endSeg))
+            {
+                anchor = endPoint;
+                endJoint = null;
+            }
+        }
+
+        bool anchored = PieceAnchored(bottom) || anchor != null;
+        ReleaseAttachments(bottom, anchored);
+
+        if (bottom.Count > 0)
+        {
+            GameObject temp = new("DetachedRope");
+            DetachedRope dr = temp.AddComponent<DetachedRope>();
+            temp.AddComponent<LineRenderer>();
+            float lifetime = anchored ? -1f : 0.5f;
+            dr.Initialize(bottom, lineRenderer, lifetime, anchor);
+        }
+
+        // Find the highest attached object remaining on the rope
+        int fadeIndex = -1;
+        RopeSegment fadeObject = null;
+        for (int i = 0; i < attachedObjects.Count; i++)
+        {
+            var att = attachedObjects[i];
+            if (att.segment == null)
+                continue;
+            int idx = segments.IndexOf(att.segment);
+            if (idx >= 0 && idx > fadeIndex)
+            {
+                fadeIndex = idx;
+                fadeObject = att.segment;
+            }
+        }
+
+        if (fadeIndex != -1 && fadeIndex < segments.Count - 1)
+        {
+            int start = fadeIndex + 1;
+            RopeSegment cutSeg = segments[start];
+            List<RopeSegment> piece = segments.GetRange(start, segments.Count - start);
+            segments.RemoveRange(start, segments.Count - start);
+            if (lineRenderer != null)
+            {
+                lineRenderer.positionCount = segments.Count + 1;
+            }
+
+            cutSeg.Cut();
+
+            Transform anchor2 = null;
+            if (endJoint != null)
+            {
+                RopeSegment endSeg = endJoint.GetComponent<RopeSegment>();
+                if (piece.Contains(endSeg))
+                {
+                    anchor2 = endPoint;
+                    endJoint = null;
+                }
+            }
+
+            bool anchored2 = PieceAnchored(piece) || anchor2 != null;
+            ReleaseAttachments(piece, anchored2);
+            if (piece.Count > 0)
+            {
+                GameObject temp2 = new("DetachedRope");
+                DetachedRope dr2 = temp2.AddComponent<DetachedRope>();
+                temp2.AddComponent<LineRenderer>();
+                float lifetime2 = anchored2 ? -1f : 0.5f;
+                dr2.Initialize(piece, lineRenderer, lifetime2, anchor2);
+            }
+
+            // if there were objects below the cut, detach the object at fadeIndex
+            if (objectBelow && fadeObject != null)
+            {
+                foreach (var att in attachedObjects)
+                {
+                    if (att.segment == fadeObject && att.instance != null)
+                    {
+                        var j = att.instance.GetComponent<DistanceJoint2D>();
+                        if (j != null)
+                            Destroy(j);
+                        att.segment = null;
+                        break;
+                    }
+                }
+            }
         }
     }
 }
