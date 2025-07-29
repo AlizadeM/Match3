@@ -31,12 +31,33 @@ public class DetachedRope : MonoBehaviour
         if (destructionScheduled || time <= 0f)
             return;
         destructionScheduled = true;
+        StartCoroutine(FadeAndDestroy(time));
+    }
+
+    private System.Collections.IEnumerator FadeAndDestroy(float time)
+    {
+        float remaining = time;
+        float fade = Mathf.Min(0.5f, time);
+        while (remaining > 0f)
+        {
+            if (remaining < fade && lineRenderer != null)
+            {
+                float t = remaining / fade;
+                Color start = lineRenderer.startColor;
+                Color end = lineRenderer.endColor;
+                start.a = end.a = t;
+                lineRenderer.startColor = start;
+                lineRenderer.endColor = end;
+            }
+            remaining -= Time.deltaTime;
+            yield return null;
+        }
         foreach (var seg in segments)
         {
             if (seg != null)
-                Destroy(seg.gameObject, time);
+                Destroy(seg.gameObject);
         }
-        Destroy(gameObject, time);
+        Destroy(gameObject);
     }
 
     // Called by RopeController immediately after creation.
@@ -155,7 +176,7 @@ public class DetachedRope : MonoBehaviour
             {
                 lineRenderer.positionCount = segments.Count;
             }
-            lifetime = 5f;
+            lifetime = 0.5f;
             ScheduleDestruction(lifetime);
         }
 

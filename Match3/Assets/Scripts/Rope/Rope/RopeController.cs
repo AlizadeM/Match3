@@ -50,6 +50,19 @@ public class RopeController : MonoBehaviour
     [Tooltip("Segment index on endSegmentRope to attach to.")]
     public int endSegmentIndex;
 
+    [System.Serializable]
+    public class AttachedObject
+    {
+        public GameObject prefab;
+        public int segmentIndex;
+
+        [HideInInspector] public RopeSegment segment;
+        [HideInInspector] public GameObject instance;
+    }
+
+    [Header("Objects Attached to Segments")]
+    public List<AttachedObject> attachedObjects = new();
+
     private readonly List<RopeSegment> segments = new();
     private LineRenderer lineRenderer;
     private DistanceJoint2D endJoint;
@@ -135,6 +148,7 @@ public class RopeController : MonoBehaviour
             return;
         }
         BuildRope();
+        AttachObjects();
         StartCoroutine(ApplySegmentConnections());
     }
 
@@ -235,6 +249,66 @@ public class RopeController : MonoBehaviour
         }
     }
 
+    private void AttachObjects()
+    {
+        foreach (var obj in attachedObjects)
+        {
+            if (obj.prefab == null) continue;
+            if (obj.segmentIndex < 0 || obj.segmentIndex >= segments.Count) continue;
+            RopeSegment seg = segments[obj.segmentIndex];
+            GameObject inst = Instantiate(obj.prefab, seg.transform.position, Quaternion.identity);
+            Rigidbody2D segBody = seg.GetComponent<Rigidbody2D>();
+            DistanceJoint2D joint = inst.AddComponent<DistanceJoint2D>();
+            joint.autoConfigureDistance = false;
+            joint.distance = 0f;
+            joint.connectedBody = segBody;
+            obj.instance = inst;
+            obj.segment = seg;
+        }
+    }
+
+    private bool PieceAnchored(List<RopeSegment> piece)
+    {
+        HashSet<Rigidbody2D> bodies = new();
+        foreach (var s in piece)
+        {
+            var rb = s.GetComponent<Rigidbody2D>();
+            if (rb != null) bodies.Add(rb);
+        }
+
+        foreach (var s in piece)
+        {
+            foreach (var j in s.GetComponents<DistanceJoint2D>())
+            {
+                if (j == null) continue;
+                Rigidbody2D cb = j.connectedBody;
+                if (cb == null)
+                {
+                    return true;
+                }
+                if (!bodies.Contains(cb))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void ReleaseAttachments(List<RopeSegment> piece, bool anchored)
+    {
+        if (anchored) return;
+        foreach (var att in attachedObjects)
+        {
+            if (att.segment != null && att.instance != null && piece.Contains(att.segment))
+            {
+                var j = att.instance.GetComponent<DistanceJoint2D>();
+                if (j != null) Destroy(j);
+                att.segment = null;
+            }
+        }
+    }
+
     // Update the LineRenderer positions based on current segment positions.
     private void DrawRope()
     {
@@ -283,26 +357,27 @@ public class RopeController : MonoBehaviour
         // cut only the first segment so the chain stays intact
         seg.Cut();
 
-        bool keepAnchor = false;
+        Transform anchor = null;
         if (endJoint != null)
         {
             RopeSegment endSeg = endJoint.GetComponent<RopeSegment>();
             if (bottom.Contains(endSeg))
             {
-                // piece stays attached to the end object
-                keepAnchor = true;
+                anchor = endPoint;
                 endJoint = null;
             }
         }
 
-        // create a temporary object to render the detached piece
+        bool anchored = PieceAnchored(bottom) || anchor != null;
+        ReleaseAttachments(bottom, anchored);
+
         if (bottom.Count > 0)
         {
             GameObject temp = new("DetachedRope");
             DetachedRope dr = temp.AddComponent<DetachedRope>();
             temp.AddComponent<LineRenderer>();
-            float lifetime = keepAnchor ? -1f : 5f;
-            dr.Initialize(bottom, lineRenderer, lifetime, keepAnchor ? endPoint : null);
+            float lifetime = anchored ? -1f : 0.5f;
+            dr.Initialize(bottom, lineRenderer, lifetime, anchor);
         }
     }
 }
