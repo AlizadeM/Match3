@@ -38,16 +38,25 @@ public class DetachedRope : MonoBehaviour
     {
         float remaining = time;
         float fade = Mathf.Min(0.5f, time);
+        // fade out over the last portion of lifetime
         while (remaining > 0f)
         {
             if (remaining < fade && lineRenderer != null)
             {
                 float t = remaining / fade;
+                // adjust start/end colors
                 Color start = lineRenderer.startColor;
                 Color end = lineRenderer.endColor;
                 start.a = end.a = t;
                 lineRenderer.startColor = start;
                 lineRenderer.endColor = end;
+                // also update material tint if present so any shader respects the fade
+                if (lineRenderer.material != null)
+                {
+                    Color mc = lineRenderer.material.color;
+                    mc.a = t;
+                    lineRenderer.material.color = mc;
+                }
             }
             remaining -= Time.deltaTime;
             yield return null;
