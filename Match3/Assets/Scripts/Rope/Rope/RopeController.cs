@@ -142,11 +142,47 @@ public class RopeController : MonoBehaviour
 
     private void Start()
     {
+        StartCoroutine(Initialize());
+    }
+
+    private System.Collections.IEnumerator Initialize()
+    {
+        // Wait a frame so referenced ropes have time to build their segments
+        yield return null;
+
+        // If startPoint wasn't provided, use the referenced rope segment
+        if (startPoint == null && startSegmentRope != null)
+        {
+            RopeSegment seg = null;
+            // Wait until the target segment exists
+            while (seg == null)
+            {
+                seg = startSegmentRope.GetSegment(startSegmentIndex);
+                if (seg == null)
+                    yield return null;
+            }
+            startPoint = seg.transform;
+        }
+
+        // Same for the end anchor
+        if (endPoint == null && endSegmentRope != null)
+        {
+            RopeSegment seg = null;
+            while (seg == null)
+            {
+                seg = endSegmentRope.GetSegment(endSegmentIndex);
+                if (seg == null)
+                    yield return null;
+            }
+            endPoint = seg.transform;
+        }
+
         if (segmentPrefab == null || startPoint == null)
         {
             Debug.LogError("RopeController is missing required references.");
-            return;
+            yield break;
         }
+
         BuildRope();
         AttachObjects();
         StartCoroutine(ApplySegmentConnections());
