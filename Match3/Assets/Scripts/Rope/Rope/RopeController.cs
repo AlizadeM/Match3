@@ -374,16 +374,6 @@ public class RopeController : MonoBehaviour
         // bottom part including the cut segment
         List<RopeSegment> bottom = segments.GetRange(index, segments.Count - index);
 
-        // record if any attached objects belong to this falling section
-        bool objectBelow = false;
-        foreach (var att in attachedObjects)
-        {
-            if (att.segment != null && bottom.Contains(att.segment))
-            {
-                objectBelow = true;
-                break;
-            }
-        }
 
         // remove them from this rope
         segments.RemoveRange(index, segments.Count - index);
@@ -471,21 +461,6 @@ public class RopeController : MonoBehaviour
                 dr2.Initialize(piece, lineRenderer, lifetime2, anchor2);
             }
 
-            // if there were objects below the cut, detach the object at fadeIndex
-            if (objectBelow && fadeObject != null)
-            {
-                foreach (var att in attachedObjects)
-                {
-                    if (att.segment == fadeObject && att.instance != null)
-                    {
-                        var j = att.instance.GetComponent<DistanceJoint2D>();
-                        if (j != null)
-                            Destroy(j);
-                        att.segment = null;
-                        break;
-                    }
-                }
-            }
         }
     }
 }
