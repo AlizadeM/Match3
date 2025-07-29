@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -152,7 +153,7 @@ public class RopeController : MonoBehaviour
         StartCoroutine(ApplySegmentConnections());
     }
 
-    private System.Collections.IEnumerator ApplySegmentConnections()
+    private IEnumerator ApplySegmentConnections()
     {
         // wait one frame so other ropes can finish building
         yield return null;
