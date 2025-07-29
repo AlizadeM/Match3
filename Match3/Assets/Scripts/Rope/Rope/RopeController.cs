@@ -39,6 +39,17 @@ public class RopeController : MonoBehaviour
     [Tooltip("Layer mask used by the slicer to detect rope colliders.")]
     public LayerMask ropeLayer;
 
+    [Header("Connect To Another Rope")]
+    [Tooltip("Optional rope whose segment will act as this rope's start anchor.")]
+    public RopeController startSegmentRope;
+    [Tooltip("Segment index on startSegmentRope to attach to.")]
+    public int startSegmentIndex;
+
+    [Tooltip("Optional rope whose segment will act as this rope's end anchor.")]
+    public RopeController endSegmentRope;
+    [Tooltip("Segment index on endSegmentRope to attach to.")]
+    public int endSegmentIndex;
+
     private readonly List<RopeSegment> segments = new();
     private LineRenderer lineRenderer;
     private DistanceJoint2D endJoint;
@@ -124,6 +135,31 @@ public class RopeController : MonoBehaviour
             return;
         }
         BuildRope();
+        StartCoroutine(ApplySegmentConnections());
+    }
+
+    private System.Collections.IEnumerator ApplySegmentConnections()
+    {
+        // wait one frame so other ropes can finish building
+        yield return null;
+
+        if (startSegmentRope != null)
+        {
+            RopeSegment seg = startSegmentRope.GetSegment(startSegmentIndex);
+            if (seg != null)
+            {
+                AttachStartAnchor(seg.transform);
+            }
+        }
+
+        if (endSegmentRope != null)
+        {
+            RopeSegment seg = endSegmentRope.GetSegment(endSegmentIndex);
+            if (seg != null)
+            {
+                AttachEndAnchor(seg.transform);
+            }
+        }
     }
 
     private void Update()
