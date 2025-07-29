@@ -374,6 +374,17 @@ public class RopeController : MonoBehaviour
         // bottom part including the cut segment
         List<RopeSegment> bottom = segments.GetRange(index, segments.Count - index);
 
+        // record if any attached objects belong to this falling section
+        bool objectBelow = false;
+        foreach (var att in attachedObjects)
+        {
+            if (att.segment != null && bottom.Contains(att.segment))
+            {
+                objectBelow = true;
+                break;
+            }
+        }
+
         // remove them from this rope
         segments.RemoveRange(index, segments.Count - index);
 
@@ -409,31 +420,47 @@ public class RopeController : MonoBehaviour
             dr.Initialize(bottom, lineRenderer, lifetime, anchor);
         }
 
-        // Look for the closest attached object on the remaining part of the rope
+        // Find the highest attached object remaining on the rope
         int fadeIndex = -1;
+        RopeSegment fadeObject = null;
         for (int i = 0; i < attachedObjects.Count; i++)
         {
             var att = attachedObjects[i];
             if (att.segment == null)
                 continue;
             int idx = segments.IndexOf(att.segment);
-            if (idx >= 0 && (fadeIndex == -1 || idx > fadeIndex))
+            if (idx >= 0 && idx > fadeIndex)
             {
                 fadeIndex = idx;
+                fadeObject = att.segment;
             }
         }
 
-        if (fadeIndex != -1)
+        if (fadeIndex != -1 && fadeIndex < segments.Count - 1)
         {
-            RopeSegment cutSeg = segments[fadeIndex];
-            List<RopeSegment> piece = segments.GetRange(fadeIndex, segments.Count - fadeIndex);
-            segments.RemoveRange(fadeIndex, segments.Count - fadeIndex);
+            int start = fadeIndex + 1;
+            RopeSegment cutSeg = segments[start];
+            List<RopeSegment> piece = segments.GetRange(start, segments.Count - start);
+            segments.RemoveRange(start, segments.Count - start);
             if (lineRenderer != null)
             {
                 lineRenderer.positionCount = segments.Count + 1;
             }
+
             cutSeg.Cut();
-            bool anchored2 = PieceAnchored(piece);
+
+            Transform anchor2 = null;
+            if (endJoint != null)
+            {
+                RopeSegment endSeg = endJoint.GetComponent<RopeSegment>();
+                if (piece.Contains(endSeg))
+                {
+                    anchor2 = endPoint;
+                    endJoint = null;
+                }
+            }
+
+            bool anchored2 = PieceAnchored(piece) || anchor2 != null;
             ReleaseAttachments(piece, anchored2);
             if (piece.Count > 0)
             {
@@ -441,7 +468,23 @@ public class RopeController : MonoBehaviour
                 DetachedRope dr2 = temp2.AddComponent<DetachedRope>();
                 temp2.AddComponent<LineRenderer>();
                 float lifetime2 = anchored2 ? -1f : 0.5f;
-                dr2.Initialize(piece, lineRenderer, lifetime2);
+                dr2.Initialize(piece, lineRenderer, lifetime2, anchor2);
+            }
+
+            // if there were objects below the cut, detach the object at fadeIndex
+            if (objectBelow && fadeObject != null)
+            {
+                foreach (var att in attachedObjects)
+                {
+                    if (att.segment == fadeObject && att.instance != null)
+                    {
+                        var j = att.instance.GetComponent<DistanceJoint2D>();
+                        if (j != null)
+                            Destroy(j);
+                        att.segment = null;
+                        break;
+                    }
+                }
             }
         }
     }
