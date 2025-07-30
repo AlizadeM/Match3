@@ -464,8 +464,9 @@ public class RopeController : MonoBehaviour
             GameObject temp = new("DetachedRope");
             DetachedRope dr = temp.AddComponent<DetachedRope>();
             temp.AddComponent<LineRenderer>();
-            float lifetime = (anchored && bottomHasObj) ? -1f : 0.5f;
-            dr.Initialize(bottom, lineRenderer, lifetime, anchor);
+            // Always fade detached pieces so they disappear after a short delay
+            const float pieceLife = 0.5f;
+            dr.Initialize(bottom, lineRenderer, pieceLife, anchor);
         }
 
         if (!hadObjects)
@@ -531,8 +532,9 @@ public class RopeController : MonoBehaviour
                     GameObject temp2 = new("DetachedRope");
                     DetachedRope dr2 = temp2.AddComponent<DetachedRope>();
                     temp2.AddComponent<LineRenderer>();
-                    float lifetime2 = (anchored2 && pieceObj) ? -1f : 0.5f;
-                    dr2.Initialize(piece, lineRenderer, lifetime2, anchor2);
+                    // Fading behaviour is uniform regardless of anchors
+                    const float pieceLife = 0.5f;
+                    dr2.Initialize(piece, lineRenderer, pieceLife, anchor2);
                 }
             }
         }
