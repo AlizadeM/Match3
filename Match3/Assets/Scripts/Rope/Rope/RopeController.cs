@@ -331,6 +331,26 @@ public class RopeController : MonoBehaviour
         return false;
     }
 
+    private bool PieceHasObjects(List<RopeSegment> piece)
+    {
+        foreach (var att in attachedObjects)
+        {
+            if (att.segment != null && piece.Contains(att.segment))
+                return true;
+        }
+        return false;
+    }
+
+    private bool RopeHasObjects()
+    {
+        foreach (var att in attachedObjects)
+        {
+            if (att.segment != null)
+                return true;
+        }
+        return false;
+    }
+
     private void ReleaseAttachments(List<RopeSegment> piece, bool anchored)
     {
         // Detach any registered objects that belong to this piece
@@ -407,9 +427,10 @@ public class RopeController : MonoBehaviour
             return;
         }
 
+        bool hadObjects = RopeHasObjects();
+
         // bottom part including the cut segment
         List<RopeSegment> bottom = segments.GetRange(index, segments.Count - index);
-
 
         // remove them from this rope
         segments.RemoveRange(index, segments.Count - index);
@@ -435,6 +456,7 @@ public class RopeController : MonoBehaviour
         }
 
         bool anchored = PieceAnchored(bottom) || anchor != null;
+        bool bottomHasObj = PieceHasObjects(bottom);
         ReleaseAttachments(bottom, anchored);
 
         if (bottom.Count > 0)
@@ -442,61 +464,77 @@ public class RopeController : MonoBehaviour
             GameObject temp = new("DetachedRope");
             DetachedRope dr = temp.AddComponent<DetachedRope>();
             temp.AddComponent<LineRenderer>();
-            float lifetime = anchored ? -1f : 0.5f;
+            float lifetime = (anchored && bottomHasObj) ? -1f : 0.5f;
             dr.Initialize(bottom, lineRenderer, lifetime, anchor);
         }
 
-        // Find the highest attached object remaining on the rope
-        int fadeIndex = -1;
-        RopeSegment fadeObject = null;
-        for (int i = 0; i < attachedObjects.Count; i++)
+        if (!hadObjects)
         {
-            var att = attachedObjects[i];
-            if (att.segment == null)
-                continue;
-            int idx = segments.IndexOf(att.segment);
-            if (idx >= 0 && idx > fadeIndex)
+            List<RopeSegment> topPiece = new(segments);
+            segments.Clear();
+
+            if (topPiece.Count > 0)
             {
-                fadeIndex = idx;
-                fadeObject = att.segment;
+                GameObject tempTop = new("DetachedRope");
+                DetachedRope drTop = tempTop.AddComponent<DetachedRope>();
+                tempTop.AddComponent<LineRenderer>();
+                drTop.Initialize(topPiece, lineRenderer, 0.5f, startPoint);
             }
+
+            Destroy(gameObject);
         }
-
-        if (fadeIndex != -1 && fadeIndex < segments.Count - 1)
+        else
         {
-            int start = fadeIndex + 1;
-            RopeSegment cutSeg = segments[start];
-            List<RopeSegment> piece = segments.GetRange(start, segments.Count - start);
-            segments.RemoveRange(start, segments.Count - start);
-            if (lineRenderer != null)
+            // Find the highest attached object remaining on the rope
+            int fadeIndex = -1;
+            for (int i = 0; i < attachedObjects.Count; i++)
             {
-                lineRenderer.positionCount = segments.Count + 1;
-            }
-
-            cutSeg.Cut();
-
-            Transform anchor2 = null;
-            if (endJoint != null)
-            {
-                RopeSegment endSeg = endJoint.GetComponent<RopeSegment>();
-                if (piece.Contains(endSeg))
+                var att = attachedObjects[i];
+                if (att.segment == null)
+                    continue;
+                int idx = segments.IndexOf(att.segment);
+                if (idx >= 0 && idx > fadeIndex)
                 {
-                    anchor2 = endPoint;
-                    endJoint = null;
+                    fadeIndex = idx;
                 }
             }
 
-            bool anchored2 = PieceAnchored(piece) || anchor2 != null;
-            ReleaseAttachments(piece, anchored2);
-            if (piece.Count > 0)
+            if (fadeIndex != -1 && fadeIndex < segments.Count - 1)
             {
-                GameObject temp2 = new("DetachedRope");
-                DetachedRope dr2 = temp2.AddComponent<DetachedRope>();
-                temp2.AddComponent<LineRenderer>();
-                float lifetime2 = anchored2 ? -1f : 0.5f;
-                dr2.Initialize(piece, lineRenderer, lifetime2, anchor2);
-            }
+                int start = fadeIndex + 1;
+                RopeSegment cutSeg = segments[start];
+                List<RopeSegment> piece = segments.GetRange(start, segments.Count - start);
+                segments.RemoveRange(start, segments.Count - start);
+                if (lineRenderer != null)
+                {
+                    lineRenderer.positionCount = segments.Count + 1;
+                }
 
+                cutSeg.Cut();
+
+                Transform anchor2 = null;
+                if (endJoint != null)
+                {
+                    RopeSegment endSeg = endJoint.GetComponent<RopeSegment>();
+                    if (piece.Contains(endSeg))
+                    {
+                        anchor2 = endPoint;
+                        endJoint = null;
+                    }
+                }
+
+                bool anchored2 = PieceAnchored(piece) || anchor2 != null;
+                bool pieceObj = PieceHasObjects(piece);
+                ReleaseAttachments(piece, anchored2);
+                if (piece.Count > 0)
+                {
+                    GameObject temp2 = new("DetachedRope");
+                    DetachedRope dr2 = temp2.AddComponent<DetachedRope>();
+                    temp2.AddComponent<LineRenderer>();
+                    float lifetime2 = (anchored2 && pieceObj) ? -1f : 0.5f;
+                    dr2.Initialize(piece, lineRenderer, lifetime2, anchor2);
+                }
+            }
         }
     }
 }
