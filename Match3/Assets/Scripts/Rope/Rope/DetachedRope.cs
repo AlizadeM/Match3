@@ -173,7 +173,8 @@ public class DetachedRope : MonoBehaviour
             GameObject temp = new("DetachedRope");
             DetachedRope dr = temp.AddComponent<DetachedRope>();
             temp.AddComponent<LineRenderer>();
-            float life = keepAnchor ? -1f : (lifetime > 0f ? lifetime : 0.5f);
+            // New piece should always fade out after a short delay
+            float life = lifetime > 0f ? lifetime : 0.5f;
             dr.Initialize(bottom, lineRenderer, life, keepAnchor ? endAnchor : null);
         }
 
